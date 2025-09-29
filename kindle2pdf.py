@@ -1,8 +1,7 @@
 # coding=utf-8
 # Kindle to PDF Converter
-# Launch kindle for PC
-# Require installing Ghostscript and ExifTool
-# pip install pyautogui fpdf pillow
+# Launch kindle for PC before running this script
+
 from dataclasses import dataclass
 import os
 import pyautogui
@@ -12,21 +11,29 @@ import argparse
 import time
 from PIL import Image
 import pygetwindow as gw
-import sys
 
 @dataclass
 class K2pConfig:
-    border_color: tuple = (0xE7, 0xE7, 0xE7)
-    background_color: tuple = (0xFF, 0xFF, 0xFF)
-
+    """
+    @brief Configuration for border and background color detection.
+    """
+    border_color: tuple = (0xE7, 0xE7, 0xE7)      /**< Border color (RGB) */
+    background_color: tuple = (0xFF, 0xFF, 0xFF)  /**< Background color (RGB) */
 
 class kindle2pdf():
-    PAGE_NUMBER_MAX = 500  # safety limit
-    OUTPUT_FOLDER = 'output'
-    TEMP_BOOK_NAME = 'temp_book.pdf'
-    TEMP_CMP_BOOK_NAME = 'temp_cmp_book.pdf'
+    """
+    @brief Main class for converting Kindle pages to PDF.
+    """
+    PAGE_NUMBER_MAX = 500  /**< Safety limit for maximum page number */
+    OUTPUT_FOLDER = 'output'  /**< Output folder for images and PDFs */
+    TEMP_BOOK_NAME = 'temp_book.pdf'  /**< Temporary PDF file name */
+    TEMP_CMP_BOOK_NAME = 'temp_cmp_book.pdf'  /**< Temporary compressed PDF file name */
 
     def __init__(self, config: K2pConfig = None):
+        """
+        @brief Constructor. Initializes configuration and internal variables.
+        @param config K2pConfig object for border/background color.
+        """
         self.config = config or K2pConfig()
         self.prev_img = None
         self.image_width = None
@@ -35,15 +42,21 @@ class kindle2pdf():
         self.image_bottom:tuple = None
         self.kindle_window = None
 
-    # save image
     def _save_image(self, im, page_num):
-        # create "output" folder if not exists
+        """
+        @brief Save the captured image to the output folder.
+        @param im PIL.Image object to save.
+        @param page_num Page number for filename.
+        """
         if not os.path.exists(self.OUTPUT_FOLDER):
             os.makedirs(self.OUTPUT_FOLDER)
         im.save(f'{self.OUTPUT_FOLDER}/page_{page_num:04d}.png')
 
     def _next_page(self, right=False):
-        # Get Kindle window coordinates and click relative to its top-left corner
+        """
+        @brief Click the next page button in Kindle window.
+        @param right If True, click right side for next page (for comics).
+        """
         if self.kindle_window is None:
             raise ValueError("Kindle window not set.")
 
@@ -58,12 +71,20 @@ class kindle2pdf():
         time.sleep(0.5)  # wait for page to load
 
     def _is_last_page(self, im):
-        # check if previous image is same as current image
+        """
+        @brief Check if the current image is the same as the previous image (last page detection).
+        @param im PIL.Image object of current page.
+        @return True if last page, False otherwise.
+        """
         if self.prev_img:
-            # compare image bytes
             return self.prev_img.tobytes() == im.tobytes()
 
     def _capture_all_pages(self, right=False):
+        """
+        @brief Capture all pages from Kindle window.
+        @param right If True, use right-side page navigation (for comics).
+        @return Number of pages captured.
+        """
         page_number = 0
         while True:
             print(f'Capturing page {page_number + 1}...')
@@ -86,6 +107,12 @@ class kindle2pdf():
         return page_number
 
     def _find_left_border(self, im, sample_y):
+        """
+        @brief Detect the left border position in the image.
+        @param im PIL.Image object.
+        @param sample_y Y-coordinate to sample.
+        @return X-coordinate of left border or None.
+        """
         width, height = im.size
         border_find = False
         prev_pixel = None
@@ -102,6 +129,12 @@ class kindle2pdf():
         return None
     
     def _find_right_border(self, im, sample_y):
+        """
+        @brief Detect the right border position in the image.
+        @param im PIL.Image object.
+        @param sample_y Y-coordinate to sample.
+        @return X-coordinate of right border or None.
+        """
         width, height = im.size
         prev_pixel = None
         for x in range(width-20, -1, -1): # skip 20 pixels from right edge because of black border
@@ -113,9 +146,13 @@ class kindle2pdf():
         return None
 
     def _detect_crop_border_x(self, im):
+        """
+        @brief Detect crop positions for left and right borders.
+        @param im PIL.Image object.
+        @return Tuple (left, right) crop positions.
+        """
         left = None
         right = None
-        # get width and height
         width, height = im.size
         y_block = height//3
         sample_y_list = (y_block, y_block*2)
@@ -129,6 +166,12 @@ class kindle2pdf():
         return left, right
 
     def _find_top_border(self, im, sample_x):
+        """
+        @brief Detect the top border position in the image.
+        @param im PIL.Image object.
+        @param sample_x X-coordinate to sample.
+        @return Y-coordinate of top border or None.
+        """
         width, height = im.size
         for y in range(height):
             pixel = im.getpixel((sample_x, y))
@@ -137,6 +180,12 @@ class kindle2pdf():
         return None
 
     def _find_bottom_border(self, im, sample_x):
+        """
+        @brief Detect the bottom border position in the image.
+        @param im PIL.Image object.
+        @param sample_x X-coordinate to sample.
+        @return Y-coordinate of bottom border or None.
+        """
         width, height = im.size
         border_find = False
         for y in range(height-1, -1, -1):
@@ -150,9 +199,13 @@ class kindle2pdf():
         return None
 
     def _detect_crop_border_y(self, im):
+        """
+        @brief Detect crop positions for top and bottom borders.
+        @param im PIL.Image object.
+        @return Tuple (top, bottom) crop positions.
+        """
         top = None
         bottom = None
-        # get width and height
         width, height = im.size
         x_block = width//3
         sample_x_list = (x_block, x_block*2)
@@ -167,6 +220,10 @@ class kindle2pdf():
         return top, bottom
 
     def _calc_image_size(self, page_number):
+        """
+        @brief Calculate the cropping area for all images.
+        @param page_number Number of pages to process.
+        """
         left    = None
         right   = None
         top     = None
@@ -200,11 +257,13 @@ class kindle2pdf():
             print(f'Crop offsets: top-left({self.image_top[0]}, {self.image_top[1]}), bottom-right({self.image_bottom[0]}, {self.image_bottom[1]})')
         else:
             print('Could not calculate image size due to missing offsets.')
-            # throw error
             raise ValueError('Could not calculate image size due to missing offsets.')
 
-
     def _crop_images(self, page_number):
+        """
+        @brief Crop all images according to detected borders.
+        @param page_number Number of pages to crop.
+        """
         print('Cropping images...')
         for i in range(page_number):
             img_path = f'{self.OUTPUT_FOLDER}/page_{i + 1:04d}.png'
@@ -214,6 +273,11 @@ class kindle2pdf():
         print('Cropping completed.')
 
     def _paste_right_half(self, pdf, img_path):
+        """
+        @brief Paste the right half of the image into the PDF (for comics).
+        @param pdf FPDF object.
+        @param img_path Path to image file.
+        """
         half_width = self.image_width // 2
         with Image.open(img_path) as im:
             right_half = im.crop((half_width, 0, self.image_width, self.image_height))
@@ -223,6 +287,11 @@ class kindle2pdf():
         os.remove(temp_path)
 
     def _paste_left_half(self, pdf, img_path):
+        """
+        @brief Paste the left half of the image into the PDF (for comics).
+        @param pdf FPDF object.
+        @param img_path Path to image file.
+        """
         half_width = self.image_width // 2
         with Image.open(img_path) as im:
             left_half = im.crop((0, 0, half_width, self.image_height))
@@ -232,6 +301,11 @@ class kindle2pdf():
         os.remove(temp_path)
 
     def _create_pdf(self, page_number, comic):
+        """
+        @brief Create a PDF file from captured images.
+        @param page_number Number of pages.
+        @param comic If True, treat as comic (split pages).
+        """
         print('Creating PDF...')
         if comic:
             half_width = self.image_width // 2
@@ -252,6 +326,9 @@ class kindle2pdf():
         print('PDF created.')
 
     def _compress_pdf(self):
+        """
+        @brief Compress the PDF file using Ghostscript.
+        """
         print('Compressing PDF...')
         gs_command = [
         'gswin64c',
@@ -271,6 +348,11 @@ class kindle2pdf():
           print('Error during PDF compression:', e)
 
     def _inject_metadata(self, input_pdf, output_pdf):
+        """
+        @brief Inject metadata into the PDF file using exiftool.
+        @param input_pdf Path to input PDF.
+        @param output_pdf Path to output PDF.
+        """
         print('Injecting metadata...')
         command = f'exiftool '\
                 f'-Creator="PFU ScanSnap Organizer 4.1.30 #S1500" '\
@@ -288,6 +370,10 @@ class kindle2pdf():
         print(f"Metadata injected. Output saved to {output_pdf}")
 
     def _clean_up(self, page_number):
+        """
+        @brief Remove temporary image and PDF files.
+        @param page_number Number of pages to clean up.
+        """
         for i in range(page_number):
             img_path = f'{self.OUTPUT_FOLDER}/page_{i + 1:04d}.png'
             if os.path.exists(img_path):
@@ -302,6 +388,10 @@ class kindle2pdf():
             os.remove(tmp_cmp_book_path)
 
     def _get_kindle_window(self):
+        """
+        @brief Get the Kindle for PC window handle.
+        @throws ValueError if window not found.
+        """
         kindle_windows = [w for w in gw.getWindowsWithTitle('Kindle for PC') if w.visible]
         if kindle_windows:
             self.kindle_window = kindle_windows[0]
@@ -310,12 +400,20 @@ class kindle2pdf():
             raise ValueError("Kindle window not found.")
 
     def _capture_kindle_window(self):
+        """
+        @brief Capture a screenshot of the Kindle window.
+        @return PIL.Image object of the screenshot.
+        """
         if self.kindle_window is None:
             raise ValueError("Kindle window not set.")
         im = pyautogui.screenshot(region=(self.kindle_window.left, self.kindle_window.top, self.kindle_window.width-1, self.kindle_window.height-1))
         return im
 
     def _maximize_kindle_window(self):
+        """
+        @brief Activate and maximize the Kindle window.
+        @throws ValueError if window not set.
+        """
         if(self.kindle_window is None):
             raise ValueError("Kindle window not set.")
 
@@ -326,6 +424,12 @@ class kindle2pdf():
         time.sleep(1)
 
     def main_process(self, comic, output_book_name, right):
+        """
+        @brief Main process to capture, crop, and convert Kindle pages to PDF.
+        @param comic If True, treat as comic (split pages).
+        @param output_book_name Output PDF file name.
+        @param right If True, use right-side navigation.
+        """
         self._get_kindle_window()
         self._maximize_kindle_window()
         page_num = self._capture_all_pages(right)
@@ -337,6 +441,9 @@ class kindle2pdf():
         self._clean_up(page_num)
 
 if __name__ == '__main__':
+    """
+    @brief Entry point for command-line execution.
+    """
     parser = argparse.ArgumentParser(description='Kindle to PDF Converter')
     parser.add_argument('-name', nargs='?', default='kindle_book', help='Book name')
     parser.add_argument('-comic', action='store_true', help='Capture comic pages')
@@ -356,4 +463,3 @@ if __name__ == '__main__':
 
     k2p = kindle2pdf(config)
     k2p.main_process(comic, output_book_name, right)
-
