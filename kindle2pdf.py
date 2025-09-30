@@ -24,7 +24,7 @@ class kindle2pdf():
     """
     @brief Main class for converting Kindle pages to PDF.
     """
-    PAGE_NUMBER_MAX = 500  # Safety limit for maximum page number
+    PAGE_NUMBER_MAX = 1000  # Safety limit for maximum page number
     OUTPUT_FOLDER = 'output'  # Output folder for images and PDFs
     TEMP_BOOK_NAME = 'temp_book.pdf'  # Temporary PDF file name
     TEMP_CMP_BOOK_NAME = 'temp_cmp_book.pdf'  # Temporary compressed PDF file name
