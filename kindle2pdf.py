@@ -17,17 +17,17 @@ class K2pConfig:
     """
     @brief Configuration for border and background color detection.
     """
-    border_color: tuple = (0xE7, 0xE7, 0xE7)      /**< Border color (RGB) */
-    background_color: tuple = (0xFF, 0xFF, 0xFF)  /**< Background color (RGB) */
+    border_color: tuple = (0xE7, 0xE7, 0xE7)      # Border color (RGB)
+    background_color: tuple = (0xFF, 0xFF, 0xFF)  # Background color (RGB)
 
 class kindle2pdf():
     """
     @brief Main class for converting Kindle pages to PDF.
     """
-    PAGE_NUMBER_MAX = 500  /**< Safety limit for maximum page number */
-    OUTPUT_FOLDER = 'output'  /**< Output folder for images and PDFs */
-    TEMP_BOOK_NAME = 'temp_book.pdf'  /**< Temporary PDF file name */
-    TEMP_CMP_BOOK_NAME = 'temp_cmp_book.pdf'  /**< Temporary compressed PDF file name */
+    PAGE_NUMBER_MAX = 500  # Safety limit for maximum page number
+    OUTPUT_FOLDER = 'output'  # Output folder for images and PDFs
+    TEMP_BOOK_NAME = 'temp_book.pdf'  # Temporary PDF file name
+    TEMP_CMP_BOOK_NAME = 'temp_cmp_book.pdf'  # Temporary compressed PDF file name
 
     def __init__(self, config: K2pConfig = None):
         """
