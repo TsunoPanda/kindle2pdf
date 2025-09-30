@@ -300,22 +300,29 @@ class kindle2pdf():
         pdf.image(temp_path, 0, 0, half_width, self.image_height)
         os.remove(temp_path)
 
-    def _create_pdf(self, page_number, comic):
+    def _create_pdf(self, page_number, comic, right):
         """
         @brief Create a PDF file from captured images.
         @param page_number Number of pages.
         @param comic If True, treat as comic (split pages).
         """
         print('Creating PDF...')
-        if comic:
+        if comic:                
             half_width = self.image_width // 2
             pdf = FPDF(unit='pt', format=[half_width, self.image_height])
+            if right:
+                paste_first_page = self._paste_left_half
+                paste_second_page = self._paste_right_half
+            else:
+                paste_first_page = self._paste_right_half
+                paste_second_page = self._paste_left_half
+
             for i in range(page_number):
                 img_path = f'{self.OUTPUT_FOLDER}/page_{i + 1:04d}.png'
                 pdf.add_page()
-                self._paste_right_half(pdf, img_path)
+                paste_first_page(pdf, img_path)
                 pdf.add_page()
-                self._paste_left_half(pdf, img_path)
+                paste_second_page(pdf, img_path)
         else:
             pdf = FPDF(unit='pt', format=[self.image_width, self.image_height])
             for i in range(page_number):
@@ -328,6 +335,7 @@ class kindle2pdf():
     def _compress_pdf(self):
         """
         @brief Compress the PDF file using Ghostscript.
+        @throws RuntimeError if compression fails.
         """
         print('Compressing PDF...')
         gs_command = [
@@ -342,10 +350,11 @@ class kindle2pdf():
         f'{self.OUTPUT_FOLDER}/{self.TEMP_BOOK_NAME}'
         ]
         try:        
-          subprocess.run(gs_command, check=True)
-          print('PDF compressed.')
+            subprocess.run(gs_command, check=True)
+            print('PDF compressed.')
         except subprocess.CalledProcessError as e:
-          print('Error during PDF compression:', e)
+            print('Error during PDF compression:', e)
+            raise RuntimeError('PDF compression failed.') from e
 
     def _inject_metadata(self, input_pdf, output_pdf):
         """
@@ -435,7 +444,7 @@ class kindle2pdf():
         page_num = self._capture_all_pages(right)
         self._calc_image_size(page_num)
         self._crop_images(page_num)
-        self._create_pdf(page_num, comic)
+        self._create_pdf(page_num, comic, right)
         self._compress_pdf()
         self._inject_metadata(f'{self.OUTPUT_FOLDER}/{self.TEMP_CMP_BOOK_NAME}', output_book_name)
         self._clean_up(page_num)
